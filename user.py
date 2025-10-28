@@ -27,19 +27,19 @@ class UserInterface:
         location = self.st.text_input("Enter the location where the waste occurred: ")
         
         return {
-            "itemName": itemName,
-            "itemCategory": itemCategory,
-            "quantityWasted": quantityWasted,
-            "reason": reasonWasted,
-            "date": dateWasted,
-            "cost": cost,
-            "location": location
+            "Item Name": itemName,
+            "Item Category": itemCategory,
+            "Quantity Wasted (kg)": quantityWasted,
+            "Reason": reasonWasted,
+            "Date": dateWasted,
+            "Cost ($)": cost,
+            "Location": location
         }
     
 try:
     df = pd.read_csv(CSV_FILE) # Load existing data
 except FileNotFoundError: # If file doesn't exist, create a new one
-    df = pd.DataFrame(columns=["itemName", "itemCategory", "quantityWasted", "reason", "date", "cost", "location"]) # Define columns
+    df = pd.DataFrame(columns=["Item Name", "Item Category", "Quantity Wasted (kg)", "Reason", "Date", "Cost ($)", "Location"]) # Define columns
     df.to_csv(CSV_FILE, index=False) # Create file if it doesn't exist
 
 
@@ -56,6 +56,18 @@ if(ui.st.button("Submit Waste Entry")): #Submit Button
 if(ui.st.button("View Waste Log")): #View Log Button
     ui.st.subheader("Waste Log")
     ui.st.dataframe(df) #Display dataframe
+
+
+    #Total Waste Calculation
+    df["Quantity Wasted (kg)"] = pd.to_numeric(df["Quantity Wasted (kg)"], errors='coerce').fillna(0)
+    total_waste = df["Quantity Wasted (kg)"].sum() #Calculate total waste
+    ui.st.write(f"Total Waste: {total_waste} kg") #Display
+
+    #Top 3 Wasted Items
+    top3 = df.groupby("Item Name", as_index=False)["Quantity Wasted (kg)"].sum().nlargest(3, "Quantity Wasted (kg)") #Top 3 wasted items
+    ui.st.subheader("Top 3 Wasted Items")
+    ui.st.dataframe(top3) #Display top 3
+
 
     
 
