@@ -70,7 +70,7 @@ if(ui.st.button("View Waste Log")): #View Log Button
 
     #Bar Chart
     category_df = df.groupby("Item Category", as_index=False)["Quantity Wasted (kg)"].sum() #Group by category
-    color_map {
+    color_map = {
         "Plastic": "blue",
         "Paper": "green",
         "Metal": "gray",
