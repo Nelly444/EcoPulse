@@ -83,11 +83,21 @@ if(ui.st.button("View Waste Log")): #View Log Button
     ui.st.plotly_chart(bar_fig) #Display bar chart
 
 
-    #Line Chart
+    #Line Chart for Waste Trend
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce') #Convert to datetime
-    trend_df = df.groupby("Date", as_index=False)["Quantity Wasted (kg)"].sum() #Group by date
-    trend_fig = px.line(trend_df, x="Date", y="Quantity Wasted (kg)", title="Waste Trend Over Time") #Line chart
-    ui.st.plotly_chart(trend_fig) #Display line chart
+    waste_trend_df = df.groupby("Date", as_index=False)["Quantity Wasted (kg)"].sum() #Group by date
+    waste_trend_fig = px.line(waste_trend_df, x="Date", y="Quantity Wasted (kg)", title="Waste Trend Over Time") #Line chart for waste
+    ui.st.plotly_chart(waste_trend_fig) #Display line chart for waste
+
+    #Line chart for Cost Trend
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce') #Convert to datetime
+    cost_trend_df = df.groupby("Date", as_index=False)["Cost ($)"].sum() #Group by date
+    cost_trend_fig = px.line(cost_trend_df, x="Date", y="Cost ($)", title="Cost Trend Over Time") #Line chart for cost
+    ui.st.plotly_chart(cost_trend_fig) #Display line chart for cost
+    
+
+
+
 
 
     
