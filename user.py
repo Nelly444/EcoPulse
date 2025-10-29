@@ -1,7 +1,7 @@
 #User Interface
 
 import streamlit as st
-
+import plotly.express as px
 import pandas as pd
 from datetime import datetime
 
@@ -67,6 +67,27 @@ if(ui.st.button("View Waste Log")): #View Log Button
     top3 = df.groupby("Item Name", as_index=False)["Quantity Wasted (kg)"].sum().nlargest(3, "Quantity Wasted (kg)") #Top 3 wasted items
     ui.st.subheader("Top 3 Wasted Items")
     ui.st.dataframe(top3) #Display top 3
+
+    #Bar Chart
+    category_df = df.groupby("Item Category", as_index=False)["Quantity Wasted (kg)"].sum() #Group by category
+    color_map {
+        "Plastic": "blue",
+        "Paper": "green",
+        "Metal": "gray",
+        "Glass": "orange",
+        "Organic": "brown",
+        "Other": "gray"
+    }
+
+    bar_fig = px.bar(category_df, x="Item Category", y="Quantity Wasted (kg)", color="Item Category", color_discrete_map=color_map, text_auto=True, title="Total Waste by Category") #Bar chart
+    ui.st.plotly_chart(bar_fig) #Display bar chart
+
+
+    #Line Chart
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce') #Convert to datetime
+    trend_df = df.groupby("Date", as_index=False)["Quantity Wasted (kg)"].sum() #Group by date
+    trend_fig = px.line(trend_df, x="Date", y="Quantity Wasted (kg)", title="Waste Trend Over Time") #Line chart
+    ui.st.plotly_chart(trend_fig) #Display line chart
 
 
     
