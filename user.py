@@ -53,45 +53,79 @@ if(ui.st.button("Submit Waste Entry")): #Submit Button
     df.to_csv(CSV_FILE, index=False) #Save to CSV
     ui.st.success("Waste entry logged successfully!") #Success message
 
-if(ui.st.button("View Waste Log")): #View Log Button
+if(ui.st.checkbox("View Waste Log")): #View Log Button
+
+    ui.st.sidebar.header("Filters") #Sidebar header
+    categories = df["Item Category"].dropna().unique()
+    locations = df["Location"].dropna().unique()
+
+    #Side bar filters
+    selected_categories = ui.st.sidebar.multiselect("Filter by Category", categories, default=categories) #Category filter
+    selected_locations = ui.st.sidebar.multiselect("Filter by Location", locations, default=locations) #Location filter
+
+    filtered_df = df[
+        (df["Item Category"].isin(selected_categories)) &
+        (df["Location"].isin(selected_locations))
+    ] #Apply filters
+
+    #Display filtered dataframe
     ui.st.subheader("Waste Log")
-    ui.st.dataframe(df) #Display dataframe
+    ui.st.dataframe(filtered_df) #Display dataframe
 
 
     #Total Waste Calculation
-    df["Quantity Wasted (kg)"] = pd.to_numeric(df["Quantity Wasted (kg)"], errors='coerce').fillna(0)
-    total_waste = df["Quantity Wasted (kg)"].sum() #Calculate total waste
+    filtered_df["Quantity Wasted (kg)"] = pd.to_numeric(filtered_df["Quantity Wasted (kg)"], errors='coerce').fillna(0)
+    total_waste = filtered_df["Quantity Wasted (kg)"].sum() #Calculate total waste
     ui.st.write(f"Total Waste: {total_waste} kg") #Display
 
     #Top 3 Wasted Items
-    top3 = df.groupby("Item Name", as_index=False)["Quantity Wasted (kg)"].sum().nlargest(3, "Quantity Wasted (kg)") #Top 3 wasted items
+    top3 = filtered_df.groupby("Item Name", as_index=False)["Quantity Wasted (kg)"].sum().nlargest(3, "Quantity Wasted (kg)") #Top 3 wasted items
     ui.st.subheader("Top 3 Wasted Items")
     ui.st.dataframe(top3) #Display top 3
 
     #Bar Chart
-    category_df = df.groupby("Item Category", as_index=False)["Quantity Wasted (kg)"].sum() #Group by category
-    color_map = {
-        "Plastic": "blue",
-        "Paper": "green",
-        "Metal": "gray",
-        "Glass": "orange",
-        "Organic": "brown",
-        "Other": "gray"
-    }
+    grouped_df = filtered_df.groupby(["Item Category", "Reason"], as_index=False).agg({
+        "Quantity Wasted (kg)": "sum",
+        "Cost ($)": "sum"
+    })#Group by category
+    
 
-    bar_fig = px.bar(category_df, x="Item Category", y="Quantity Wasted (kg)", color="Item Category", color_discrete_map=color_map, text_auto=True, title="Total Waste by Category") #Bar chart
+    bar_fig = px.bar(
+    grouped_df,
+    x="Item Category",
+    y="Quantity Wasted (kg)",
+    color="Reason",#Stacked by Reason
+    hover_data={
+        "Quantity Wasted (kg)": True,
+        "Cost ($)": True,
+        "Reason": True
+    },
+    text_auto=True,
+    title="Total Waste by Category"
+)
+    
+    bar_fig.update_traces(
+    hovertemplate=
+    "<b>Category:</b> %{x}<br>" +
+    "<b>Reason:</b> %{customdata[0]}<br>" +
+    "<b>Quantity:</b> %{y} kg<br>" +
+    "<b>Cost:</b> $%{customdata[1]:.2f}",
+    customdata=grouped_df[["Reason", "Cost ($)"]].values
+)
+
+
     ui.st.plotly_chart(bar_fig) #Display bar chart
 
 
     #Line Chart for Waste Trend
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce') #Convert to datetime
-    waste_trend_df = df.groupby("Date", as_index=False)["Quantity Wasted (kg)"].sum() #Group by date
+    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce') #Convert to datetime
+    waste_trend_df = filtered_df.groupby("Date", as_index=False)["Quantity Wasted (kg)"].sum() #Group by date
     waste_trend_fig = px.line(waste_trend_df, x="Date", y="Quantity Wasted (kg)", title="Waste Trend Over Time") #Line chart for waste
     ui.st.plotly_chart(waste_trend_fig) #Display line chart for waste
 
     #Line chart for Cost Trend
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce') #Convert to datetime
-    cost_trend_df = df.groupby("Date", as_index=False)["Cost ($)"].sum() #Group by date
+    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce') #Convert to datetime
+    cost_trend_df = filtered_df.groupby("Date", as_index=False)["Cost ($)"].sum() #Group by date
     cost_trend_fig = px.line(cost_trend_df, x="Date", y="Cost ($)", title="Cost Trend Over Time") #Line chart for cost
     ui.st.plotly_chart(cost_trend_fig) #Display line chart for cost
     
