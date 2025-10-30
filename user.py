@@ -48,12 +48,17 @@ ui.display_title() #Display title
 
 entry = ui.get_input() #Get user input
 
-if(ui.st.button("Submit Waste Entry")): #Submit Button
+
+#Submit Button
+if(ui.st.button("Submit Waste Entry")):
     df = pd.concat([df, pd.DataFrame([entry])], ignore_index=True) #Add new entry to dataframe
     df.to_csv(CSV_FILE, index=False) #Save to CSV
     ui.st.success("Waste entry logged successfully!") #Success message
 
-if(ui.st.checkbox("View Waste Log")): #View Log Button
+
+
+#View Log Button
+if(ui.st.checkbox("View Waste Log")): 
 
     ui.st.sidebar.header("Filters") #Sidebar header
     categories = df["Item Category"].dropna().unique()
@@ -83,11 +88,13 @@ if(ui.st.checkbox("View Waste Log")): #View Log Button
     ui.st.subheader("Top 3 Wasted Items")
     ui.st.dataframe(top3) #Display top 3
 
-    #Bar Chart
+    #Bar Chart for Waste by Category
     grouped_df = filtered_df.groupby(["Item Category", "Reason"], as_index=False).agg({
         "Quantity Wasted (kg)": "sum",
         "Cost ($)": "sum"
     })#Group by category
+
+    top_item_row = grouped_df.loc[grouped_df["Quantity Wasted (kg)"].idxmax()]
     
 
     bar_fig = px.bar(
@@ -98,10 +105,23 @@ if(ui.st.checkbox("View Waste Log")): #View Log Button
     hover_data={
         "Quantity Wasted (kg)": True,
         "Cost ($)": True,
-        "Reason": True
     },
     text_auto=True,
     title="Total Waste by Category"
+)
+    
+    bar_fig.add_annotation(
+    x=top_item_row["Item Category"],
+    y=top_item_row["Quantity Wasted (kg)"] * 1.3,
+    text=f"Top Wasted Item: {top_item_row['Reason']} ({top_item_row['Quantity Wasted (kg)']} kg)",
+    showarrow=False,
+    font=dict(color="white", size=12, family="Arial"),
+    align="center",
+    bordercolor="white",
+    borderwidth=1,
+    borderpad=4,
+    bgcolor="rgba(0, 0, 0, 0.6)",
+    opacity=0.8
 )
     
     bar_fig.update_traces(
@@ -110,7 +130,8 @@ if(ui.st.checkbox("View Waste Log")): #View Log Button
     "<b>Reason:</b> %{customdata[0]}<br>" +
     "<b>Quantity:</b> %{y} kg<br>" +
     "<b>Cost:</b> $%{customdata[1]:.2f}",
-    customdata=grouped_df[["Reason", "Cost ($)"]].values
+    customdata=grouped_df[["Reason", "Cost ($)"]].values,
+    selector=dict(type='bar')
 )
 
 
@@ -118,15 +139,29 @@ if(ui.st.checkbox("View Waste Log")): #View Log Button
 
 
     #Line Chart for Waste Trend
-    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce') #Convert to datetime
-    waste_trend_df = filtered_df.groupby("Date", as_index=False)["Quantity Wasted (kg)"].sum() #Group by date
-    waste_trend_fig = px.line(waste_trend_df, x="Date", y="Quantity Wasted (kg)", title="Waste Trend Over Time") #Line chart for waste
+    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce').dt.normalize() #Convert to datetime
+    filtered_df["Quantity Wasted (kg)"] = pd.to_numeric(filtered_df["Quantity Wasted (kg)"], errors='coerce').fillna(0)
+    filtered_df = filtered_df.dropna(subset=['Date']) #Drop rows with invalid dates
+
+    waste_weekly = filtered_df.set_index('Date').resample('W')["Quantity Wasted (kg)"].sum().reset_index() #Resample weekly
+
+    waste_weekly["MA4"] = waste_weekly["Quantity Wasted (kg)"].rolling(4, min_periods=1).mean() #4-week moving average
+
+    waste_trend_fig = px.line(waste_weekly, x="Date", y=["Quantity Wasted (kg)", "MA4"], 
+                             title="Weekly Waste Trend"
+    )
+    waste_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
     ui.st.plotly_chart(waste_trend_fig) #Display line chart for waste
 
     #Line chart for Cost Trend
-    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce') #Convert to datetime
-    cost_trend_df = filtered_df.groupby("Date", as_index=False)["Cost ($)"].sum() #Group by date
-    cost_trend_fig = px.line(cost_trend_df, x="Date", y="Cost ($)", title="Cost Trend Over Time") #Line chart for cost
+    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce').dt.normalize()
+    cost_weekly = filtered_df.set_index('Date').resample('W')["Cost ($)"].sum().reset_index() #Resample weekly
+    cost_weekly["MA4"] = cost_weekly["Cost ($)"].rolling(4, min_periods=1).mean() #4-week moving average
+
+    cost_trend_fig = px.line(cost_weekly, x="Date", y=["Cost ($)", "MA4"], 
+                             title="Weekly Cost Trend"
+    )
+    cost_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
     ui.st.plotly_chart(cost_trend_fig) #Display line chart for cost
     
 
