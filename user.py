@@ -164,6 +164,39 @@ if(ui.st.checkbox("View Waste Log")):
     cost_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
     ui.st.plotly_chart(cost_trend_fig) #Display line chart for cost
     
+     #Smart Recommendations
+    with ui.st.expander("Smart Recommendations"):
+        ui.st.subheader("Automated Weekly Insights")
+
+        filtered_df['Week'] = filtered_df['Date'].dt.to_period('W').apply(lambda r: r.start_time) #Extract week start date
+
+        #Rule 1 High Waste Share (>30%)
+        current_week = filtered_df['Week'].max()
+        this_week_df = filtered_df[filtered_df['Week'] == current_week]
+
+        if not this_week_df.empty:
+            category_sums = this_week_df.groupby('Item Category')["Quantity Wasted (kg)"].sum().reset_index()
+            item_totals = this_week_df.groupby(['Item Name', 'Item Category'])["Quantity Wasted (kg)"].sum().reset_index()
+
+            merged = pd.merge(item_totals, category_sums, on='Item Category', suffixes=('', '_CatTotal'))
+            merged['ShareOfCategory'] = merged['Quantity Wasted (kg)'] / merged['Quantity Wasted (kg)_CatTotal'] * 100
+
+
+            flagged_items = merged[merged['ShareOfCategory'] > 30]
+
+            ui.st.markdown("**Items with High Waste Share (>30%) in their Category this Week:**")
+            if not flagged_items.empty:
+                ui.st.warning("Order 20% less next cycle** for these items:")
+                ui.st.dataframe(flagged_items[['Item Name', 'Item Category', 'ShareOfCategory']].round(2))
+            else:
+                ui.st.success("No items exceeded 30% waste share in their category this week.")
+        else:
+
+            ui.st.info("No waste data available for the current week to generate insights.")
+
+            #Rule 2 Top 3 waste for 2 consecutive weeks
+
+
 
 
 
