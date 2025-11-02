@@ -3,7 +3,7 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 
 CSV_FILE = "waste_log.csv"
 
@@ -151,21 +151,33 @@ if(ui.st.checkbox("View Waste Log")):
 
 
     #Prepare data for the line charts
-    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce').dt.normalize() #Convert to datetime
+    filtered_df["Date"] = filtered_df["Date"].apply(lambda x: pd.Timestamp(x) if isinstance(x, date) else x)
+    filtered_df["Date"] = pd.to_datetime(filtered_df["Date"], errors='coerce')
+    filtered_df["Date"] = filtered_df["Date"].dt.normalize()
+    filtered_df = filtered_df.dropna(subset=['Date'])
+    filtered_df = filtered_df.sort_values('Date') # Sort by date before plotting
+
     filtered_df["Quantity Wasted (kg)"] = pd.to_numeric(filtered_df["Quantity Wasted (kg)"], errors='coerce').fillna(0)
     filtered_df["Cost ($)"] = pd.to_numeric(filtered_df["Cost ($)"], errors='coerce').fillna(0)
+
     filtered_df = filtered_df.dropna(subset=['Date']) #Drop rows with invalid dates
+    filtered_df = filtered_df.sort_values('Date') #Sort by date before plotting
+
 
     #Line chart for Waste Trend
     if not filtered_df.empty:
-        waste_weekly = filtered_df.set_index('Date').resample('W')["Quantity Wasted (kg)"].sum().reset_index() #Resample weekly
-        if not waste_weekly.empty:
-            waste_weekly["MA4"] = pd.to_numeric(waste_weekly["Quantity Wasted (kg)"].rolling(4, min_periods=1).mean()) #4-week moving average
+        waste_weekly = (
+            filtered_df.set_index('Date').resample('W')["Quantity Wasted (kg)"].sum().reset_index() #Resample weekly
+        )
+        if not waste_weekly.empty and waste_weekly["Quantity Wasted (kg)"].sum() > 0:
+            waste_weekly["MA4"] = waste_weekly["Quantity Wasted (kg)"].rolling(4, min_periods=1).mean() #4-week moving average
 
             waste_trend_fig = px.line(waste_weekly, x="Date", y=["Quantity Wasted (kg)", "MA4"], 
-                                    title="Weekly Waste Trend"
+                                    title="Weekly Waste Trend",
+                                    labels={"value": "Quantity Wasted (kg)", "variable": "Legend"}
             )
             waste_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
+            waste_trend_fig.update_traces(mode='lines+markers')  #Show markers for clarity
             ui.st.plotly_chart(waste_trend_fig) #Display line chart for waste
         else:
             ui.st.info("Not enough data to ddisplay the weekly waste trend.")
@@ -175,12 +187,14 @@ if(ui.st.checkbox("View Waste Log")):
     #Line chart for Cost Trend
     if not filtered_df.empty:
         cost_weekly = filtered_df.set_index('Date').resample('W')["Cost ($)"].sum().reset_index() #Resample weekly
-        if not cost_weekly.empty:
-            cost_weekly["MA4"] = pd.to_numeric(cost_weekly["Cost ($)"].rolling(4, min_periods=1).mean()) #4-week moving average
+        if not cost_weekly.empty and cost_weekly["Cost ($)"].sum() > 0:
+            cost_weekly["MA4"] = cost_weekly["Cost ($)"].rolling(4, min_periods=1).mean() #4-week moving average
             cost_trend_fig = px.line(cost_weekly, x="Date", y=["Cost ($)", "MA4"], 
-                                    title="Weekly Cost Trend"
+                                    title="Weekly Cost Trend",
+                                    labels={"value": "Cost ($)", "variable": "Legend"}
             )
             cost_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
+            cost_trend_fig.update_traces(mode='lines+markers')  #Show markers for clarity
             ui.st.plotly_chart(cost_trend_fig) #Display line chart for cost
         else:
             ui.st.info("Not enough data to display the weekly cost trend.")
@@ -209,7 +223,7 @@ if(ui.st.checkbox("View Waste Log")):
 
             ui.st.markdown("**Items with High Waste Share (>30%) in their Category this Week:**")
             if not flagged_items.empty:
-                ui.st.warning("Order 20% less next cycle** for these items:")
+                ui.st.warning("Order 20% less the next cycle for these items:")
                 ui.st.dataframe(flagged_items[['Item Name', 'Item Category', 'ShareOfCategory']].round(2))
             else:
                 ui.st.success("No items exceeded 30% waste share in their category this week.")
