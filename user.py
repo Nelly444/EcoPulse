@@ -46,6 +46,8 @@ except FileNotFoundError: # If file doesn't exist, create a new one
 ui = UserInterface() #Create UI instance
 ui.display_title() #Display title
 
+
+
 entry = ui.get_input() #Get user input
 
 
@@ -55,6 +57,13 @@ if(ui.st.button("Submit Waste Entry")):
     df.to_csv(CSV_FILE, index=False) #Save to CSV
     ui.st.success("Waste entry logged successfully!") #Success message
 
+#Reset Waste log Button
+if ui.st.button("Reset Waste Log"):
+    # Reset the DataFrame and CSV
+    df = pd.DataFrame(columns=["Item Name", "Item Category", "Quantity Wasted (kg)",
+                               "Reason", "Date", "Cost ($)", "Location"])
+    df.to_csv(CSV_FILE, index=False)
+    ui.st.success("Waste log has been reset.")
 
 
 #View Log Button
@@ -94,75 +103,89 @@ if(ui.st.checkbox("View Waste Log")):
         "Cost ($)": "sum"
     })#Group by category
 
-    top_item_row = grouped_df.loc[grouped_df["Quantity Wasted (kg)"].idxmax()]
+
+    if not grouped_df.empty:
+
+        bar_fig = px.bar(
+        grouped_df,
+        x="Item Category",
+        y="Quantity Wasted (kg)",
+        color="Reason",#Stacked by Reason
+        hover_data={
+            "Quantity Wasted (kg)": True,
+            "Cost ($)": True,
+        },
+        text_auto=True,
+        title="Total Waste by Category"
+    )
+        top_item_row = grouped_df.loc[grouped_df["Quantity Wasted (kg)"].idxmax()] #Get top wasted item row
+        
+        bar_fig.add_annotation(
+        x=top_item_row["Item Category"],
+        y=top_item_row["Quantity Wasted (kg)"] * 1.3,
+        text=f"Top Wasted Item: {top_item_row['Reason']} ({top_item_row['Quantity Wasted (kg)']} kg)",
+        showarrow=False,
+        font=dict(color="white", size=12, family="Arial"),
+        align="center",
+        bordercolor="white",
+        borderwidth=1,
+        borderpad=4,
+        bgcolor="rgba(0, 0, 0, 0.6)",
+        opacity=0.8
+    )
     
-
-    bar_fig = px.bar(
-    grouped_df,
-    x="Item Category",
-    y="Quantity Wasted (kg)",
-    color="Reason",#Stacked by Reason
-    hover_data={
-        "Quantity Wasted (kg)": True,
-        "Cost ($)": True,
-    },
-    text_auto=True,
-    title="Total Waste by Category"
-)
-    
-    bar_fig.add_annotation(
-    x=top_item_row["Item Category"],
-    y=top_item_row["Quantity Wasted (kg)"] * 1.3,
-    text=f"Top Wasted Item: {top_item_row['Reason']} ({top_item_row['Quantity Wasted (kg)']} kg)",
-    showarrow=False,
-    font=dict(color="white", size=12, family="Arial"),
-    align="center",
-    bordercolor="white",
-    borderwidth=1,
-    borderpad=4,
-    bgcolor="rgba(0, 0, 0, 0.6)",
-    opacity=0.8
-)
-    
-    bar_fig.update_traces(
-    hovertemplate=
-    "<b>Category:</b> %{x}<br>" +
-    "<b>Reason:</b> %{customdata[0]}<br>" +
-    "<b>Quantity:</b> %{y} kg<br>" +
-    "<b>Cost:</b> $%{customdata[1]:.2f}",
-    customdata=grouped_df[["Reason", "Cost ($)"]].values,
-    selector=dict(type='bar')
-)
+        bar_fig.update_traces(
+        hovertemplate=
+        "<b>Category:</b> %{x}<br>" +
+        "<b>Reason:</b> %{customdata[0]}<br>" +
+        "<b>Quantity:</b> %{y} kg<br>" +
+        "<b>Cost:</b> $%{customdata[1]:.2f}",
+        customdata=grouped_df[["Reason", "Cost ($)"]].values,
+        selector=dict(type='bar')
+    )
 
 
-    ui.st.plotly_chart(bar_fig) #Display bar chart
+        ui.st.plotly_chart(bar_fig) #Display bar chart
+    else:
+        ui.st.info("No data available to display the bar chart.")
 
 
-    #Line Chart for Waste Trend
+    #Prepare data for the line charts
     filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce').dt.normalize() #Convert to datetime
     filtered_df["Quantity Wasted (kg)"] = pd.to_numeric(filtered_df["Quantity Wasted (kg)"], errors='coerce').fillna(0)
+    filtered_df["Cost ($)"] = pd.to_numeric(filtered_df["Cost ($)"], errors='coerce').fillna(0)
     filtered_df = filtered_df.dropna(subset=['Date']) #Drop rows with invalid dates
 
-    waste_weekly = filtered_df.set_index('Date').resample('W')["Quantity Wasted (kg)"].sum().reset_index() #Resample weekly
+    #Line chart for Waste Trend
+    if not filtered_df.empty:
+        waste_weekly = filtered_df.set_index('Date').resample('W')["Quantity Wasted (kg)"].sum().reset_index() #Resample weekly
+        if not waste_weekly.empty:
+            waste_weekly["MA4"] = pd.to_numeric(waste_weekly["Quantity Wasted (kg)"].rolling(4, min_periods=1).mean()) #4-week moving average
 
-    waste_weekly["MA4"] = waste_weekly["Quantity Wasted (kg)"].rolling(4, min_periods=1).mean() #4-week moving average
-
-    waste_trend_fig = px.line(waste_weekly, x="Date", y=["Quantity Wasted (kg)", "MA4"], 
-                             title="Weekly Waste Trend"
-    )
-    waste_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
-    ui.st.plotly_chart(waste_trend_fig) #Display line chart for waste
+            waste_trend_fig = px.line(waste_weekly, x="Date", y=["Quantity Wasted (kg)", "MA4"], 
+                                    title="Weekly Waste Trend"
+            )
+            waste_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
+            ui.st.plotly_chart(waste_trend_fig) #Display line chart for waste
+        else:
+            ui.st.info("Not enough data to ddisplay the weekly waste trend.")
+    else:
+        ui.st.info("No waste data available.")
 
     #Line chart for Cost Trend
-    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce').dt.normalize()
-    cost_weekly = filtered_df.set_index('Date').resample('W')["Cost ($)"].sum().reset_index() #Resample weekly
-    cost_weekly["MA4"] = cost_weekly["Cost ($)"].rolling(4, min_periods=1).mean() #4-week moving average
-
-    cost_trend_fig = px.line(cost_weekly, x="Date", y=["Cost ($)", "MA4"], 
-                             title="Weekly Cost Trend"
-    )
-    cost_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
-    ui.st.plotly_chart(cost_trend_fig) #Display line chart for cost
+    if not filtered_df.empty:
+        cost_weekly = filtered_df.set_index('Date').resample('W')["Cost ($)"].sum().reset_index() #Resample weekly
+        if not cost_weekly.empty:
+            cost_weekly["MA4"] = pd.to_numeric(cost_weekly["Cost ($)"].rolling(4, min_periods=1).mean()) #4-week moving average
+            cost_trend_fig = px.line(cost_weekly, x="Date", y=["Cost ($)", "MA4"], 
+                                    title="Weekly Cost Trend"
+            )
+            cost_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
+            ui.st.plotly_chart(cost_trend_fig) #Display line chart for cost
+        else:
+            ui.st.info("Not enough data to display the weekly cost trend.")
+    else:
+        ui.st.info("No cost data available.")
     
      #Smart Recommendations
     with ui.st.expander("Smart Recommendations"):
@@ -218,7 +241,7 @@ if(ui.st.checkbox("View Waste Log")):
             ui.st.info("Not enough weekly data to analyze consecutive weeks yet.")
         else:
         #Check for consecutive weeks
-            for i in range(1, len(top3_per_week)):
+            for i in range(1, len(week_list)):
 
                 this_week_items = top3_per_week[top3_per_week['Week'] == week_list[i]]['Item Name'] #Get top 3 items this week
                 prev_week_items = top3_per_week[top3_per_week['Week'] == week_list[i-1]]['Item Name'] #Get top 3 items previous week
@@ -231,7 +254,7 @@ if(ui.st.checkbox("View Waste Log")):
                         "Item Name": item,
                         "Week 1": str(week_list[i-1].date()),
                         "Week 2": str(week_list[i].date()),
-                        "Reccommendation": "Check the vendor/date rotation."
+                        "Recommendation": "Check the vendor/date rotation."
                     })
 
         #Display flagged items
