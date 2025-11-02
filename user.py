@@ -194,7 +194,55 @@ if(ui.st.checkbox("View Waste Log")):
 
             ui.st.info("No waste data available for the current week to generate insights.")
 
-            #Rule 2 Top 3 waste for 2 consecutive weeks
+        #Rule 2 Top 3 waste for 2 consecutive weeks
+        
+        ui.st.markdown("Items in Top 3 Waste for 2 Consecutive Weeks")
+            
+        #Calculate weekly totals   
+        weekly_totals = filtered_df.groupby(['Week', 'Item Name'], as_index=False)["Quantity Wasted (kg)"].sum()
+        weekly_totals = weekly_totals.sort_values(['Week', 'Quantity Wasted (kg)'], ascending=[True, False])
+
+        top3_per_week = (
+            weekly_totals
+            .groupby('Week')       # group by the Week column
+            .head(3)               # take top 3 rows per week
+            .reset_index(drop=True)
+        )
+
+
+        consecutive_flags = []
+
+        week_list = sorted(top3_per_week['Week'].unique())
+
+        if len(week_list) < 2:
+            ui.st.info("Not enough weekly data to analyze consecutive weeks yet.")
+        else:
+        #Check for consecutive weeks
+            for i in range(1, len(top3_per_week)):
+
+                this_week_items = top3_per_week[top3_per_week['Week'] == week_list[i]]['Item Name'] #Get top 3 items this week
+                prev_week_items = top3_per_week[top3_per_week['Week'] == week_list[i-1]]['Item Name'] #Get top 3 items previous week
+
+                repeated_items = set(this_week_items).intersection(set(prev_week_items)) #Find common items
+
+                #Flag repeated items
+                for item in repeated_items:
+                    consecutive_flags.append({
+                        "Item Name": item,
+                        "Week 1": str(week_list[i-1].date()),
+                        "Week 2": str(week_list[i].date()),
+                        "Reccommendation": "Check the vendor/date rotation."
+                    })
+
+        #Display flagged items
+        if consecutive_flags:
+            flagged_df = pd.DataFrame(consecutive_flags)
+            ui.st.warning("These items were in the Top 3 for 2 consecutive weeks:")
+            ui.st.dataframe(flagged_df)
+        else:
+            ui.st.success("No items were in the Top 3 for 2 consecutive weeks.")
+
+
 
 
 
