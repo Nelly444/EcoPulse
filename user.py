@@ -59,8 +59,11 @@ if(ui.st.button("Submit Waste Entry")):
     # Ensure the new entry has the same columns and proper order
     new_entry_df = pd.DataFrame([entry], columns=df.columns)
 
-    # Concatenate safely
-    df = pd.concat([df, new_entry_df], ignore_index=True)
+    # Concatenate safely 
+    if df.empty:
+        df = new_entry_df
+    else:
+        df = pd.concat([df, new_entry_df], ignore_index=True)
 
     # Save to CSV
     df.to_csv(CSV_FILE, index=False)
