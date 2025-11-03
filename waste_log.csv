@@ -1,8 +1,6 @@
 Item Name,Item Category,Quantity Wasted (kg),Reason,Date,Cost ($),Location
-Coffee Cups,Plastic,5.0,Dirty,2025-11-02,5.0,Kitchen A
-Coffee Mugs,Glass,3.0,Broken,2025-11-03,7.0,Kitchen A
-Paper Straws,Paper,10.0,Dirty,2025-11-10,5.0,Kitchen A
-Milk,Organic,40.0,Expired,2025-11-10,20.0,Kitchen B
-Paper Straws,Paper,10.0,Broken,2025-11-13,5.0,Kitchen B
-Paper Straws,Paper,10.0,Broken,2025-11-20,5.0,Kitchen B
-Vanilla Syrup,Organic,10.0,Expired,2025-11-18,11.0,Kitchen A
+N,Paper,1.0,N,2025-11-19,3.0,ASU
+S,Paper,1.0,N,2025-11-19 00:00:00,3.0,ASU
+Paper,Paper,10.0,edfsd,2025-11-02 00:00:00,10.0,A
+fsdfdsfds,Paper,30.0,sdfdsf,2025-11-02 00:00:00,10.0,ASU
+dfsdfdsfds,Paper,50.0,sdfdsf,2025-11-05 00:00:00,10.0,ASU

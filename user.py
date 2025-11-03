@@ -3,6 +3,7 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
+import numpy as np
 from datetime import datetime, date
 
 CSV_FILE = "waste_log.csv"
@@ -53,9 +54,20 @@ entry = ui.get_input() #Get user input
 
 #Submit Button
 if(ui.st.button("Submit Waste Entry")):
-    df = pd.concat([df, pd.DataFrame([entry])], ignore_index=True) #Add new entry to dataframe
-    df.to_csv(CSV_FILE, index=False) #Save to CSV
-    ui.st.success("Waste entry logged successfully!") #Success message
+     # Convert date from datetime.date to pd.Timestamp
+    entry["Date"] = pd.Timestamp(entry["Date"])
+
+    # Ensure the new entry has the same columns and proper order
+    new_entry_df = pd.DataFrame([entry], columns=df.columns)
+
+    # Concatenate safely
+    df = pd.concat([df, new_entry_df], ignore_index=True)
+
+    # Save to CSV
+    df.to_csv(CSV_FILE, index=False)
+
+    # Success message
+    ui.st.success("Waste entry logged successfully!")
 
 #Reset Waste log Button
 if ui.st.button("Reset Waste Log"):
@@ -150,15 +162,34 @@ if(ui.st.checkbox("View Waste Log")):
         ui.st.info("No data available to display the bar chart.")
 
 
-    #Prepare data for the line charts
-    filtered_df["Date"] = filtered_df["Date"].apply(lambda x: pd.Timestamp(x) if isinstance(x, date) else x)
-    filtered_df["Date"] = pd.to_datetime(filtered_df["Date"], errors='coerce')
-    filtered_df["Date"] = filtered_df["Date"].dt.normalize()
+    #Prepping Data for Line Charts
+
+    # Convert 'Date' column safely, handling datetime.date and strings
+    def ensure_datetime(val):
+        if isinstance(val, date) and not isinstance(val, datetime):  # catch datetime.date
+            return datetime.combine(val, datetime.min.time())
+        return val
+
+    filtered_df['Date'] = filtered_df['Date'].apply(ensure_datetime)
+
+    # Now convert everything to pandas datetime (safely)
+    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce')
+
+    # Drop invalid dates
     filtered_df = filtered_df.dropna(subset=['Date'])
-    filtered_df = filtered_df.sort_values('Date') # Sort by date before plotting
+
+    # Normalize to remove time
+    filtered_df['Date'] = filtered_df['Date'].dt.normalize()
 
     filtered_df["Quantity Wasted (kg)"] = pd.to_numeric(filtered_df["Quantity Wasted (kg)"], errors='coerce').fillna(0)
-    filtered_df["Cost ($)"] = pd.to_numeric(filtered_df["Cost ($)"], errors='coerce').fillna(0)
+    filtered_df['Cost ($)'] = (
+    filtered_df['Cost ($)']
+        .astype(str).str.replace(r'[^0-9.\-]', '', regex=True)
+        .replace('', np.nan)
+        .astype(float)
+)
+    for col in filtered_df.select_dtypes(include=['object']).columns:
+        filtered_df[col] = filtered_df[col].astype(str).replace('nan', '')
 
     filtered_df = filtered_df.dropna(subset=['Date']) #Drop rows with invalid dates
     filtered_df = filtered_df.sort_values('Date') #Sort by date before plotting
