@@ -8,7 +8,6 @@ from datetime import datetime, date
 
 CSV_FILE = "waste_log.csv"
 
-
 class UserInterface:
 
     def __init__(self):
@@ -298,7 +297,7 @@ if(ui.st.checkbox("View Waste Log")):
                         "Week 2": str(week_list[i].date()),
                         "Recommendation": "Check the vendor/date rotation."
                     })
-                    
+
         #Display flagged items
         if consecutive_flags:
             flagged_df = pd.DataFrame(consecutive_flags)
