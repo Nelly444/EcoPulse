@@ -15,7 +15,10 @@ class UserInterface:
         self.st = st
 
     def display_title(self):
-        self.st.title("Waste Management Tracker")
+        self.st.markdown(
+            "<h1 style='color:#4CAF50; text-align:center;'>EcoPulse</h1>",
+            unsafe_allow_html=True
+        )
     
     def get_input(self):
         itemName = self.st.text_input("Enter the name of the waste item: ")
@@ -46,6 +49,8 @@ except FileNotFoundError: # If file doesn't exist, create a new one
 
 ui = UserInterface() #Create UI instance
 ui.display_title() #Display title
+
+
 
 
 
