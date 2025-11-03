@@ -160,22 +160,12 @@ if(ui.st.checkbox("View Waste Log")):
 
     #Prepping Data for Line Charts
 
-    # Convert 'Date' column safely, handling datetime.date and strings
-    def ensure_datetime(val):
-        if isinstance(val, date) and not isinstance(val, datetime):  # catch datetime.date
-            return datetime.combine(val, datetime.min.time())
-        return val
-
-    filtered_df['Date'] = filtered_df['Date'].apply(ensure_datetime)
-
-    # Now convert everything to pandas datetime (safely)
+    # Ensure 'Date' column is proper datetime
     filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce')
-
-    # Drop invalid dates
     filtered_df = filtered_df.dropna(subset=['Date'])
-
-    # Normalize to remove time
     filtered_df['Date'] = filtered_df['Date'].dt.normalize()
+
+
 
     filtered_df["Quantity Wasted (kg)"] = pd.to_numeric(filtered_df["Quantity Wasted (kg)"], errors='coerce').fillna(0)
     filtered_df['Cost ($)'] = (
@@ -233,11 +223,14 @@ if(ui.st.checkbox("View Waste Log")):
     with ui.st.expander("Smart Recommendations"):
         ui.st.subheader("Automated Weekly Insights")
 
-        filtered_df['Week'] = filtered_df['Date'].dt.to_period('W').apply(lambda r: r.start_time) #Extract week start date
+        filtered_df['Week'] = filtered_df['Date'].dt.to_period('W')
 
         #Rule 1 High Waste Share (>30%)
         current_week = filtered_df['Week'].max()
         this_week_df = filtered_df[filtered_df['Week'] == current_week]
+
+        this_week_df['Item Category'] = this_week_df['Item Category'].str.strip()
+        this_week_df['Item Name'] = this_week_df['Item Name'].str.strip()
 
         if not this_week_df.empty:
             category_sums = this_week_df.groupby('Item Category')["Quantity Wasted (kg)"].sum().reset_index()
@@ -262,6 +255,9 @@ if(ui.st.checkbox("View Waste Log")):
         #Rule 2 Top 3 waste for 2 consecutive weeks
         
         ui.st.markdown("Items in Top 3 Waste for 2 Consecutive Weeks")
+
+        filtered_df['Item Name'] = filtered_df['Item Name'].str.strip()
+        filtered_df['Item Category'] = filtered_df['Item Category'].str.strip()
             
         #Calculate weekly totals   
         weekly_totals = filtered_df.groupby(['Week', 'Item Name'], as_index=False)["Quantity Wasted (kg)"].sum()
@@ -283,20 +279,21 @@ if(ui.st.checkbox("View Waste Log")):
         else:
         #Check for consecutive weeks
             for i in range(1, len(week_list)):
+                if (week_list[i] - week_list[i-1]).n == 1:
+                    this_week_items = top3_per_week[top3_per_week['Week'] == week_list[i]]['Item Name'].astype(str).str.strip() #Items this week
+                    prev_week_items = top3_per_week[top3_per_week['Week'] == week_list[i-1]]['Item Name'].astype(str).str.strip() #Items previous week
 
-                this_week_items = top3_per_week[top3_per_week['Week'] == week_list[i]]['Item Name'] #Get top 3 items this week
-                prev_week_items = top3_per_week[top3_per_week['Week'] == week_list[i-1]]['Item Name'] #Get top 3 items previous week
 
-                repeated_items = set(this_week_items).intersection(set(prev_week_items)) #Find common items
+                    repeated_items = set(this_week_items).intersection(set(prev_week_items)) #Find common items
 
-                #Flag repeated items
-                for item in repeated_items:
-                    consecutive_flags.append({
-                        "Item Name": item,
-                        "Week 1": str(week_list[i-1].date()),
-                        "Week 2": str(week_list[i].date()),
-                        "Recommendation": "Check the vendor/date rotation."
-                    })
+                    #Flag repeated items
+                    for item in repeated_items:
+                        consecutive_flags.append({
+                            "Item Name": item,
+                            "Week 1": str(week_list[i-1].date()),
+                            "Week 2": str(week_list[i].date()),
+                            "Recommendation": "Check the vendor/date rotation."
+                        })
 
         #Display flagged items
         if consecutive_flags:
