@@ -207,7 +207,8 @@ if(ui.st.checkbox("View Waste Log")):
                                     title="Weekly Waste Trend",
                                     labels={"value": "Quantity Wasted (kg)", "variable": "Legend"}
             )
-            waste_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
+            waste_trend_fig.update_xaxes(rangeslider_visible = True, tickformat='%b %d', showgrid=True) #Add range slider
+            waste_trend_fig.update_yaxes(title="Quantity Wasted (kg)", showgrid=True)
             waste_trend_fig.update_traces(mode='lines+markers')  #Show markers for clarity
             ui.st.plotly_chart(waste_trend_fig) #Display line chart for waste
         else:
@@ -224,7 +225,8 @@ if(ui.st.checkbox("View Waste Log")):
                                     title="Weekly Cost Trend",
                                     labels={"value": "Cost ($)", "variable": "Legend"}
             )
-            cost_trend_fig.update_xaxes(rangeslider_visible = True) #Add range slider
+            cost_trend_fig.update_xaxes(rangeslider_visible = True, tickformat='%b %d', showgrid=True) #Add range slider
+            cost_trend_fig.update_yaxes(title="USD per week", showgrid=True)
             cost_trend_fig.update_traces(mode='lines+markers')  #Show markers for clarity
             ui.st.plotly_chart(cost_trend_fig) #Display line chart for cost
         else:
