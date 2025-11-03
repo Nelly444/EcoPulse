@@ -50,12 +50,7 @@ except FileNotFoundError: # If file doesn't exist, create a new one
 ui = UserInterface() #Create UI instance
 ui.display_title() #Display title
 
-
-
-
-
 entry = ui.get_input() #Get user input
-
 
 #Submit Button
 if(ui.st.button("Submit Waste Entry")):
@@ -82,7 +77,6 @@ if ui.st.button("Reset Waste Log"):
     df.to_csv(CSV_FILE, index=False)
     ui.st.success("Waste log has been reset.")
 
-
 #View Log Button
 if(ui.st.checkbox("View Waste Log")): 
 
@@ -103,7 +97,6 @@ if(ui.st.checkbox("View Waste Log")):
     ui.st.subheader("Waste Log")
     ui.st.dataframe(filtered_df) #Display dataframe
 
-
     #Total Waste Calculation
     filtered_df["Quantity Wasted (kg)"] = pd.to_numeric(filtered_df["Quantity Wasted (kg)"], errors='coerce').fillna(0)
     total_waste = filtered_df["Quantity Wasted (kg)"].sum() #Calculate total waste
@@ -119,7 +112,6 @@ if(ui.st.checkbox("View Waste Log")):
         "Quantity Wasted (kg)": "sum",
         "Cost ($)": "sum"
     })#Group by category
-
 
     if not grouped_df.empty:
 
@@ -198,7 +190,6 @@ if(ui.st.checkbox("View Waste Log")):
 
     filtered_df = filtered_df.dropna(subset=['Date']) #Drop rows with invalid dates
     filtered_df = filtered_df.sort_values('Date') #Sort by date before plotting
-
 
     #Line chart for Waste Trend
     if not filtered_df.empty:
@@ -284,7 +275,6 @@ if(ui.st.checkbox("View Waste Log")):
             .reset_index(drop=True)
         )
 
-
         consecutive_flags = []
 
         week_list = sorted(top3_per_week['Week'].unique())
@@ -308,7 +298,7 @@ if(ui.st.checkbox("View Waste Log")):
                         "Week 2": str(week_list[i].date()),
                         "Recommendation": "Check the vendor/date rotation."
                     })
-
+                    
         #Display flagged items
         if consecutive_flags:
             flagged_df = pd.DataFrame(consecutive_flags)
