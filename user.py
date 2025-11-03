@@ -223,14 +223,31 @@ if(ui.st.checkbox("View Waste Log")):
     with ui.st.expander("Smart Recommendations"):
         ui.st.subheader("Automated Weekly Insights")
 
-        filtered_df['Week'] = filtered_df['Date'].dt.to_period('W')
+        # Ensure Date is datetime before creating Week column
+        if 'Date' in filtered_df.columns:
+            filtered_df['Date'] = pd.to_datetime(filtered_df['Date'], errors='coerce')
+            filtered_df = filtered_df.dropna(subset=['Date'])
+        
+        # Create Week column from Date (only if Date exists and is datetime)
+        if 'Date' in filtered_df.columns and pd.api.types.is_datetime64_any_dtype(filtered_df['Date']):
+            filtered_df['Week'] = filtered_df['Date'].dt.to_period('W')
+        else:
+            ui.st.error("Date column is missing or not in datetime format. Cannot create Week column.")
+            filtered_df['Week'] = None
 
         #Rule 1 High Waste Share (>30%)
-        current_week = filtered_df['Week'].max()
-        this_week_df = filtered_df[filtered_df['Week'] == current_week]
-
-        this_week_df['Item Category'] = this_week_df['Item Category'].str.strip()
-        this_week_df['Item Name'] = this_week_df['Item Name'].str.strip()
+        # Check if Week column is valid before using it
+        if 'Week' not in filtered_df.columns or filtered_df['Week'].isna().all():
+            ui.st.error("Week column is missing or invalid. Cannot analyze current week data.")
+            this_week_df = pd.DataFrame()
+        else:
+            current_week = filtered_df['Week'].max()
+            this_week_df = filtered_df[filtered_df['Week'] == current_week]
+            
+            # Only strip if dataframe is not empty
+            if not this_week_df.empty:
+                this_week_df['Item Category'] = this_week_df['Item Category'].str.strip()
+                this_week_df['Item Name'] = this_week_df['Item Name'].str.strip()
 
         if not this_week_df.empty:
             category_sums = this_week_df.groupby('Item Category')["Quantity Wasted (kg)"].sum().reset_index()
@@ -256,52 +273,77 @@ if(ui.st.checkbox("View Waste Log")):
         
         ui.st.markdown("Items in Top 3 Waste for 2 Consecutive Weeks")
 
-        filtered_df['Item Name'] = filtered_df['Item Name'].str.strip()
-        filtered_df['Item Category'] = filtered_df['Item Category'].str.strip()
+        # Check if Week column exists and is valid
+        if 'Week' not in filtered_df.columns or filtered_df['Week'].isna().all():
+            ui.st.error("Week column is missing or invalid. Cannot analyze consecutive weeks.")
+        else:
+            filtered_df['Item Name'] = filtered_df['Item Name'].str.strip()
+            filtered_df['Item Category'] = filtered_df['Item Category'].str.strip()
+                
+            # Drop rows where Week is None/NaN before grouping
+            rule2_df = filtered_df.dropna(subset=['Week']).copy()
             
-        #Calculate weekly totals   
-        weekly_totals = filtered_df.groupby(['Week', 'Item Name'], as_index=False)["Quantity Wasted (kg)"].sum()
-        weekly_totals = weekly_totals.sort_values(['Week', 'Quantity Wasted (kg)'], ascending=[True, False])
+            if rule2_df.empty:
+                ui.st.info("No valid week data available for consecutive week analysis.")
+            else:
+                #Calculate weekly totals   
+                weekly_totals = rule2_df.groupby(['Week', 'Item Name'], as_index=False)["Quantity Wasted (kg)"].sum()
+                weekly_totals = weekly_totals.sort_values(['Week', 'Quantity Wasted (kg)'], ascending=[True, False])
 
-        top3_per_week = (
-            weekly_totals
-            .groupby('Week')       # group by the Week column
-            .head(3)               # take top 3 rows per week
-            .reset_index(drop=True)
-        )
+                top3_per_week = (
+                    weekly_totals
+                    .groupby('Week')       # group by the Week column
+                    .head(3)               # take top 3 rows per week
+                    .reset_index(drop=True)
+                )
 
-        consecutive_flags = []
+                consecutive_flags = []
 
-        week_list = sorted(top3_per_week['Week'].unique())
+                # Sort weeks by their start time to ensure proper order
+                week_list = sorted(top3_per_week['Week'].unique(), key=lambda x: x.start_time)
 
-        if len(week_list) < 2:
-            ui.st.info("Not enough weekly data to analyze consecutive weeks yet.")
-        else:
-        #Check for consecutive weeks
-            for i in range(1, len(week_list)):
-                if (week_list[i] - week_list[i-1]).n == 1:
-                    this_week_items = top3_per_week[top3_per_week['Week'] == week_list[i]]['Item Name'].astype(str).str.strip() #Items this week
-                    prev_week_items = top3_per_week[top3_per_week['Week'] == week_list[i-1]]['Item Name'].astype(str).str.strip() #Items previous week
+                if len(week_list) < 2:
+                    ui.st.info("Not enough weekly data to analyze consecutive weeks yet.")
+                else:
+                    #Check for consecutive weeks
+                    for i in range(1, len(week_list)):
+                        prev_week = week_list[i-1]
+                        curr_week = week_list[i]
+                        
+                        # Check if weeks are consecutive by comparing with prev_week + 1
+                        # Period objects support addition: prev_week + 1 should equal curr_week if consecutive
+                        next_expected_week = prev_week + 1
+                        
+                        # Use start_time comparison as reliable method to check consecutiveness
+                        # Consecutive weeks should be 7 days apart
+                        time_diff = curr_week.start_time - prev_week.start_time
+                        days_diff = time_diff.days
+                        
+                        # Check if weeks are consecutive (exactly 7 days apart, or using Period comparison)
+                        is_consecutive = (days_diff == 7) or (curr_week == next_expected_week)
+                        
+                        if is_consecutive:
+                            this_week_items = set(top3_per_week[top3_per_week['Week'] == week_list[i]]['Item Name'].astype(str).str.strip().tolist()) #Items this week
+                            prev_week_items = set(top3_per_week[top3_per_week['Week'] == week_list[i-1]]['Item Name'].astype(str).str.strip().tolist()) #Items previous week
 
+                            repeated_items = this_week_items.intersection(prev_week_items) #Find common items
 
-                    repeated_items = set(this_week_items).intersection(set(prev_week_items)) #Find common items
+                            #Flag repeated items
+                            for item in repeated_items:
+                                consecutive_flags.append({
+                                    "Item Name": item,
+                                    "Week 1": str(week_list[i-1]),
+                                    "Week 2": str(week_list[i]),
+                                    "Recommendation": "Check the vendor/date rotation."
+                                })
 
-                    #Flag repeated items
-                    for item in repeated_items:
-                        consecutive_flags.append({
-                            "Item Name": item,
-                            "Week 1": str(week_list[i-1].date()),
-                            "Week 2": str(week_list[i].date()),
-                            "Recommendation": "Check the vendor/date rotation."
-                        })
-
-        #Display flagged items
-        if consecutive_flags:
-            flagged_df = pd.DataFrame(consecutive_flags)
-            ui.st.warning("These items were in the Top 3 for 2 consecutive weeks:")
-            ui.st.dataframe(flagged_df)
-        else:
-            ui.st.success("No items were in the Top 3 for 2 consecutive weeks.")
+                #Display flagged items
+                if consecutive_flags:
+                    flagged_df = pd.DataFrame(consecutive_flags)
+                    ui.st.warning("These items were in the Top 3 for 2 consecutive weeks:")
+                    ui.st.dataframe(flagged_df)
+                else:
+                    ui.st.success("No items were in the Top 3 for 2 consecutive weeks.")
 
 
 
